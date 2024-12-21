@@ -88,45 +88,48 @@ app.get('/search', async (req, res) => {
 });
 
 // Subcategory Filter Route
-app.get('/category/:subcategory', async (req, res) => {
-    try {
-      const subcategory = req.params.subcategory; // Get the clicked subcategory
-      console.log('Clicked Subcategory:', subcategory);
-  
-      // Fetch products that belong to the selected subcategory (category1)
-      const productsResponse = await databases.listDocuments(databaseId, collectionId, [
-        Query.equal('category1', subcategory), // Match subcategory (category1)
-      ]);
-      const products = productsResponse.documents;
-  
-      console.log('Filtered Products:', products);
-  
-      // Fetch all products to generate the sidebar categories
-      const allProductsResponse = await databases.listDocuments(databaseId, collectionId);
-      const allProducts = allProductsResponse.documents;
-  
-      // Generate `categoryGroups` for the sidebar
-      const categoryGroups = {};
-      allProducts.forEach(product => {
-        const parentCategory = product.category || 'Uncategorized'; // Parent category
-        if (!categoryGroups[parentCategory]) {
-          categoryGroups[parentCategory] = new Set();
-        }
-        categoryGroups[parentCategory].add(product.category1); // Subcategories
-      });
-  
-      // Convert Sets to Arrays for rendering
-      Object.keys(categoryGroups).forEach(parentCategory => {
-        categoryGroups[parentCategory] = Array.from(categoryGroups[parentCategory]);
-      });
-  
-      res.render('home', { products, categoryGroups }); // Render filtered products and updated sidebar
-    } catch (error) {
-      console.error('Error fetching subcategory:', error.message);
-      res.status(500).send('Error fetching subcategory.');
-    }
-  });
-  
+app.get('/category/:categoryOrSubcategory', async (req, res) => {
+  try {
+    const categoryOrSubcategory = req.params.categoryOrSubcategory; // Get clicked category or subcategory
+    console.log('Clicked Category or Subcategory:', categoryOrSubcategory);
+
+    // Query products by `category` (parent) and `category1` (child)
+    const categoryResponse = await databases.listDocuments(databaseId, collectionId, [
+      Query.equal('category', categoryOrSubcategory), // Match parent category
+    ]);
+
+    const subcategoryResponse = await databases.listDocuments(databaseId, collectionId, [
+      Query.equal('category1', categoryOrSubcategory), // Match subcategory
+    ]);
+
+    // Combine the results from both queries
+    const products = [...categoryResponse.documents, ...subcategoryResponse.documents];
+    console.log('Filtered Products:', products);
+
+    // Fetch all products to generate the sidebar
+    const allProductsResponse = await databases.listDocuments(databaseId, collectionId);
+    const allProducts = allProductsResponse.documents;
+
+    const categoryGroups = {};
+    allProducts.forEach(product => {
+      const parentCategory = product.category || 'Uncategorized'; // Parent category
+      if (!categoryGroups[parentCategory]) {
+        categoryGroups[parentCategory] = new Set();
+      }
+      categoryGroups[parentCategory].add(product.category1); // Subcategories
+    });
+
+    // Convert sets to arrays for rendering
+    Object.keys(categoryGroups).forEach(parentCategory => {
+      categoryGroups[parentCategory] = Array.from(categoryGroups[parentCategory]);
+    });
+
+    res.render('home', { products, categoryGroups }); // Render filtered products with sidebar
+  } catch (error) {
+    console.error('Error fetching category:', error.message);
+    res.status(500).send(`Error fetching category: ${error.message}`);
+  }
+});
   
   
   
